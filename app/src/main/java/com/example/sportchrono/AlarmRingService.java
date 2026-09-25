@@ -58,6 +58,8 @@ public class AlarmRingService extends Service {
         alarmId = intent.getIntExtra("alarm_id", -1);
         org.json.JSONObject alarm = AlarmStore.find(this, alarmId);
         if (alarm == null || !alarm.optBoolean("enabled", true)) { stopSelf(); return START_NOT_STICKY; }
+        if (ringtone != null) { ringtone.stop(); ringtone = null; }
+        if (vibrator != null) vibrator.cancel();
         PendingIntent open = PendingIntent.getActivity(this, 202, new Intent(this, MainActivity.class),
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
         Notification notification = new Notification.Builder(this, CHANNEL)

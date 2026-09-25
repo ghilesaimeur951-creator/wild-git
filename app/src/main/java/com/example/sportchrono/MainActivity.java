@@ -43,6 +43,7 @@ public class MainActivity extends Activity {
     private TextView statusTitle, statusTime, statusMeta, alarmStatus, lapList;
     private Button pauseButton, stopButton;
     private int pickingToneId = -1;
+    private int shownLaps = -1;
     private final Runnable update = new Runnable() {
         public void run() { refresh(); handler.postDelayed(this, 100); }
     };
@@ -187,18 +188,22 @@ public class MainActivity extends Activity {
             }
         }), 10);
         lapList = text("", 16, MUTED, false); add(form, lapList, 14);
+        shownLaps = -1;
         showLaps();
     }
     private void showLaps() {
         if (lapList == null || tab != 0) return;
         if (SessionService.current == null || SessionService.current.mode != SessionEngine.Mode.STOPWATCH) {
-            lapList.setText(""); return;
+            if (shownLaps != 0) { lapList.setText(""); shownLaps = 0; }
+            return;
         }
         StringBuilder list = new StringBuilder(); JSONArray laps = SessionService.laps;
+        if (shownLaps == laps.length()) return;
         for (int i = laps.length() - 1; i >= 0; i--)
             list.append("Tour ").append(i + 1).append(" · ")
                     .append(format(laps.optLong(i), false)).append('\n');
         lapList.setText(list.toString());
+        shownLaps = laps.length();
     }
     private void timerForm() {
         header("Minuteur", "Une durée simple, puis un signal à la fin.");
@@ -372,11 +377,18 @@ public class MainActivity extends Activity {
             String title = "STOPWATCH".equals(mode) ? "Chronomètre" : "TIMER".equals(mode) ? "Minuteur" : "Intervalles";
             String date = android.text.format.DateFormat.getDateFormat(this).format(entry.optLong("date"));
             long seconds = entry.optLong("seconds");
+            JSONArray laps = entry.optJSONArray("laps");
+            long best = Long.MAX_VALUE, previous = 0;
+            if (laps != null) for (int n = 0; n < laps.length(); n++) {
+                long split = laps.optLong(n) - previous;
+                if (split > 0) best = Math.min(best, split);
+                previous = laps.optLong(n);
+            }
             add(form, text(title + " · " + date + "\n" + format(seconds * 1000, false)
                     + ("INTERVAL".equals(mode) ? " · " + entry.optInt("rounds") + " tours" : "")
                     + ("STOPWATCH".equals(mode) ? " · "
-                        + (entry.optJSONArray("laps") == null ? 0 : entry.optJSONArray("laps").length())
-                        + " repères" : ""),
+                        + (laps == null ? 0 : laps.length()) + " repères"
+                        + (best == Long.MAX_VALUE ? "" : " · meilleur tour " + format(best, false)) : ""),
                     17, TEXT, false), 18);
         }
     }
