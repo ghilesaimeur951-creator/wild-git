@@ -67,7 +67,7 @@ final class UiKit {
     }
     static ScrollView screen(Activity a, LinearLayout root) {
         ScrollView scroll = new ScrollView(a); scroll.setFillViewport(true);
-        scroll.setClipToPadding(false); scroll.setVerticalScrollBarEnabled(false);
+        scroll.setClipToPadding(true); scroll.setVerticalScrollBarEnabled(false);
         scroll.setBackgroundColor(BG); root.setPadding(dp(a, 18), dp(a, 18), dp(a, 18), dp(a, 48));
         scroll.addView(root); a.setContentView(scroll); insets(a, scroll, null); return scroll;
     }

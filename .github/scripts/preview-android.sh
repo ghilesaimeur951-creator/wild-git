@@ -57,3 +57,6 @@ PY
 adb shell input tap $coords
 sleep 2
 capture 04-clavier
+adb shell input keyevent 4
+tap_text '+ Ajouter un exercice'
+capture 05-catalogue

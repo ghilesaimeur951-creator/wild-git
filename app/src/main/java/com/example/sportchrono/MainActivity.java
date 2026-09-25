@@ -41,7 +41,7 @@ public class MainActivity extends Activity {
     private int tab = 0;
     private LinearLayout root, form;
     private TextView statusTitle, statusTime, statusMeta, alarmStatus, lapList;
-    private Button pauseButton, stopButton;
+    private Button pauseButton, stopButton, lapButton;
     private int pickingToneId = -1;
     private int shownLaps = -1;
     private final Runnable update = new Runnable() {
@@ -90,9 +90,10 @@ public class MainActivity extends Activity {
     }
     private void build() {
         statusTitle = statusTime = statusMeta = alarmStatus = lapList = null;
+        lapButton = null;
         LinearLayout shell = column(); shell.setBackgroundColor(BG);
         ScrollView scroll = new ScrollView(this); scroll.setFillViewport(true);
-        scroll.setVerticalScrollBarEnabled(false); scroll.setClipToPadding(false);
+        scroll.setVerticalScrollBarEnabled(false); scroll.setClipToPadding(true);
         root = column(); root.setPadding(dp(18), dp(18), dp(18), dp(38));
         scroll.addView(root);
         shell.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
@@ -194,13 +195,14 @@ public class MainActivity extends Activity {
         header("Chronomètre", "Le temps monte jusqu’à ce que vous l’arrêtiez.");
         add(form, button("Démarrer le chrono", true,
                 v -> start(SessionEngine.Mode.STOPWATCH, 0, 1, 0, 1)), 22);
-        add(form, button("Marquer un tour", false, v -> {
+        lapButton = button("Marquer un tour", false, v -> {
             SessionEngine s = SessionService.current;
             if (s != null && s.mode == SessionEngine.Mode.STOPWATCH) {
                 control(SessionService.ACTION_LAP);
                 handler.postDelayed(this::showLaps, 180);
             }
-        }), 10);
+        });
+        add(form, lapButton, 10);
         lapList = text("", 16, MUTED, false); add(form, lapList, 14);
         shownLaps = -1;
         showLaps();
@@ -526,6 +528,8 @@ public class MainActivity extends Activity {
     private void refresh() {
         SessionEngine s = SessionService.current;
         boolean active = s != null;
+        if (lapButton != null) lapButton.setVisibility(active
+                && s.mode == SessionEngine.Mode.STOPWATCH ? View.VISIBLE : View.GONE);
         if (statusTitle != null) {
             pauseButton.setVisibility(active ? View.VISIBLE : View.GONE);
             stopButton.setVisibility(active ? View.VISIBLE : View.GONE);
