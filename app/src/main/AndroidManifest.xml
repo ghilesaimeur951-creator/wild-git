@@ -17,7 +17,11 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <activity android:name=".WorkoutActivity" android:exported="false" />
+        <activity android:name=".CatalogActivity" android:exported="false" />
         <service android:name=".SessionService" android:exported="false"
+            android:foregroundServiceType="mediaPlayback" />
+        <service android:name=".WorkoutService" android:exported="false"
             android:foregroundServiceType="mediaPlayback" />
         <service android:name=".AlarmRingService" android:exported="false"
             android:foregroundServiceType="mediaPlayback" />

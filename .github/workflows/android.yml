@@ -26,6 +26,8 @@ jobs:
           mkdir -p /tmp/sport-chrono-check
           javac -d /tmp/sport-chrono-check app/src/main/java/com/example/sportchrono/SessionEngine.java EngineCheck.java
           java -cp /tmp/sport-chrono-check EngineCheck
+          javac -d /tmp/sport-chrono-check app/src/main/java/com/example/sportchrono/WorkoutPlan.java app/src/main/java/com/example/sportchrono/WorkoutEngine.java WorkoutEngineCheck.java
+          java -cp /tmp/sport-chrono-check WorkoutEngineCheck
       - name: Compiler et vérifier
         run: gradle :app:assembleDebug :app:lintDebug --no-daemon
       - uses: actions/upload-artifact@v4

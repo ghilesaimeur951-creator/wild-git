@@ -18,7 +18,9 @@ public class WidgetProvider extends AppWidgetProvider {
         if (ids.length == 0) return;
         RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget);
         SessionEngine session = SessionService.current;
-        views.setTextViewText(R.id.widget_status, session == null ? "Prêt à bouger"
+        views.setTextViewText(R.id.widget_status, WorkoutService.current != null
+                ? "Séance street workout en cours"
+                : session == null ? "Prêt à bouger"
                 : session.paused ? "Séance en pause" : "Séance en cours · tour " + session.round);
         Intent start = new Intent(context, SessionService.class).setAction(SessionService.ACTION_START)
                 .putExtra("mode", SessionEngine.Mode.INTERVAL.name())

@@ -78,6 +78,8 @@ public class SessionService extends Service {
             restoreSaved();
         }
         if (ACTION_START.equals(action)) {
+            if (WorkoutService.current != null || WorkoutStore.hasActive(this))
+                startService(new Intent(this, WorkoutService.class).setAction(WorkoutService.STOP));
             handler.removeCallbacks(ticker);
             String value = intent.getStringExtra("mode");
             SessionEngine.Mode mode;

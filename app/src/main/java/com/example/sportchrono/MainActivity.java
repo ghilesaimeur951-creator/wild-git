@@ -113,9 +113,9 @@ public class MainActivity extends Activity {
         controls.addView(stopButton, new LinearLayout.LayoutParams(0, dp(56), 1));
         add(status, controls, 16);
 
-        String[] names = {"Chrono", "Minuteur", "Intervalles", "Alarmes", "Historique", "Réglages"};
+        String[] names = {"Chrono", "Minuteur", "Intervalles", "Créer séance", "Alarmes", "Historique", "Réglages"};
         LinearLayout nav = column(); add(root, nav, 20);
-        for (int row = 0; row < 2; row++) {
+        for (int row = 0; row < 3; row++) {
             LinearLayout line = new LinearLayout(this);
             for (int i = row * 3; i < Math.min(names.length, row * 3 + 3); i++) {
                 final int selected = i;
@@ -131,8 +131,9 @@ public class MainActivity extends Activity {
             case 0: stopwatchForm(); break;
             case 1: timerForm(); break;
             case 2: intervalForm(); break;
-            case 3: alarmForm(); break;
-            case 4: historyForm(); break;
+            case 3: workoutForm(); break;
+            case 4: alarmForm(); break;
+            case 5: historyForm(); break;
             default: settingsForm();
         }
         refresh();
@@ -296,6 +297,17 @@ public class MainActivity extends Activity {
         add(form, text("La notification permet d’arrêter la sonnerie ou de la reporter de cinq minutes. Les alarmes sont reprogrammées après un redémarrage.",
                 14, MUTED, false), 18);
     }
+    private void workoutForm() {
+        header("Créer une séance street workout", "Composez les exercices, séries, repos et modes spéciaux.");
+        add(form, button(WorkoutService.current != null || WorkoutStore.hasActive(this)
+                ? "Reprendre la séance en cours" : "Créer ou charger une séance", true,
+                v -> startActivity(new Intent(this, WorkoutActivity.class))), 20);
+        add(form, text("Séries classiques, EMOM, pyramides, circuits, superséries et AMRAP. "
+                + "Les modèles et les résultats sont conservés sur cet appareil.",
+                15, MUTED, false), 17);
+        add(form, button("Voir le catalogue d’exercices", false,
+                v -> startActivity(new Intent(this, CatalogActivity.class))), 14);
+    }
     private void requestExactAlarm() {
         if (AlarmScheduler.exactAllowed(this)) return;
         Toast.makeText(this, "Autorisez les alarmes exactes pour une sonnerie à l’heure précise.",
@@ -369,6 +381,22 @@ public class MainActivity extends Activity {
     }
     private void historyForm() {
         header("Historique", "Vos séances restent sur ce téléphone.");
+        JSONArray workouts = WorkoutStore.history(this);
+        add(form, text("Street workout", 20, TEXT, true), 20);
+        if (workouts.length() == 0)
+            add(form, text("Aucune séance street workout enregistrée.", 15, MUTED, false), 10);
+        for (int n = 0; n < workouts.length(); n++) {
+            JSONObject workout = workouts.optJSONObject(n);
+            if (workout == null || workout.optJSONObject("plan") == null) continue;
+            WorkoutPlan plan = WorkoutStore.fromJson(workout.optJSONObject("plan"));
+            JSONArray results = workout.optJSONArray("events");
+            String date = android.text.format.DateFormat.getDateFormat(this).format(workout.optLong("started"));
+            add(form, button(plan.name + " · " + date + "\n"
+                    + (workout.optBoolean("completed") ? "Terminée" : "Interrompue")
+                    + " · " + (results == null ? 0 : results.length()) + " séries", false,
+                    v -> showWorkoutHistory(workout)), 9);
+        }
+        add(form, text("Chronomètres et intervalles", 20, TEXT, true), 25);
         JSONArray list = SessionStore.history(this);
         if (list.length() == 0) add(form, text("Aucune séance terminée pour le moment.", 16, MUTED, false), 20);
         for (int i = 0; i < list.length(); i++) {
@@ -392,8 +420,41 @@ public class MainActivity extends Activity {
                     17, TEXT, false), 18);
         }
     }
+    private void showWorkoutHistory(JSONObject entry) {
+        JSONObject saved = entry.optJSONObject("plan"); if (saved == null) return;
+        WorkoutPlan plan = WorkoutStore.fromJson(saved);
+        StringBuilder detail = new StringBuilder("Durée : ")
+                .append(format(entry.optLong("durationSec") * 1000, false))
+                .append("\nMode : ").append(entry.optBoolean("completed") ? "terminée" : "interrompue")
+                .append("\n\n");
+        JSONArray events = entry.optJSONArray("events");
+        if (events != null) for (int i = 0; i < events.length(); i++) {
+            JSONObject event = events.optJSONObject(i); if (event == null) continue;
+            int position = event.optInt("exercise", -1);
+            if (position < 0 || position >= plan.exercises.size()) continue;
+            WorkoutPlan.Exercise exercise = plan.exercises.get(position);
+            detail.append(exercise.name).append(" · série ").append(event.optInt("series"));
+            String result = event.optString("result");
+            detail.append("DONE".equals(result) ? " : " + event.optInt("actual") + " répétitions"
+                    : "EXPIRED".equals(result) ? " : temps écoulé, non validée" : " : passée");
+            if (event.optInt("left", -1) >= 0)
+                detail.append(" (G ").append(event.optInt("left"))
+                        .append(", D ").append(event.optInt("right")).append(")");
+            if (exercise.load != WorkoutPlan.Load.NONE)
+                detail.append(" · ").append(exercise.kilograms).append(" kg ")
+                        .append(exercise.load == WorkoutPlan.Load.ADDED ? "ajoutés" : "d’assistance");
+            detail.append(" · ").append(format(event.optLong("elapsed"), false)).append('\n');
+        }
+        ScrollView scroll = new ScrollView(this);
+        TextView body = text(detail.toString(), 16, TEXT, false);
+        body.setPadding(dp(20), dp(12), dp(20), dp(16)); scroll.addView(body);
+        new AlertDialog.Builder(this).setTitle(plan.name).setView(scroll)
+                .setPositiveButton("Fermer", null).show();
+    }
     private void settingsForm() {
         header("Sons & autorisations", "Les bips utilisent le canal d’alarme du téléphone.");
+        add(form, button("Catalogue d’exercices street workout", true,
+                v -> startActivity(new Intent(this, CatalogActivity.class))), 17);
         SharedPreferences p = Signals.prefs(this);
         CheckBox sound = new CheckBox(this); sound.setText("Sons activés"); sound.setTextColor(TEXT);
         sound.setChecked(p.getBoolean("sound", true));
@@ -464,7 +525,7 @@ public class MainActivity extends Activity {
             statusMeta.setText("Choisissez un mode ci-dessous");
             getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         }
-        if (alarmStatus != null && tab == 3) {
+        if (alarmStatus != null && tab == 4) {
             alarmStatus.setText(AlarmScheduler.exactAllowed(this)
                     ? "Horaire précis autorisé"
                     : "Android peut décaler les alarmes tant que l’accès exact est refusé.");
