@@ -16,6 +16,7 @@ final class Signals {
     static void beep(Context context, boolean finalCue) {
         SharedPreferences p = prefs(context);
         if (p.getBoolean("sound", true)) {
+            AudioCue.hold(context, finalCue ? 1200 : 400);
             ToneGenerator tone = new ToneGenerator(AudioManager.STREAM_ALARM, p.getInt("volume", 75));
             tone.startTone(finalCue ? ToneGenerator.TONE_CDMA_ALERT_CALL_GUARD
                     : ToneGenerator.TONE_PROP_BEEP, finalCue ? 900 : 120);

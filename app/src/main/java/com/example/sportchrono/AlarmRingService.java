@@ -25,6 +25,7 @@ public class AlarmRingService extends Service {
     private final Runnable timeout = () -> stopSelf();
     private Ringtone ringtone;
     private Vibrator vibrator;
+    private int alarmId = -1;
 
     static void channel(Context context) {
         NotificationChannel channel = new NotificationChannel(CHANNEL, "Alarmes", NotificationManager.IMPORTANCE_HIGH);
@@ -43,19 +44,25 @@ public class AlarmRingService extends Service {
     }
     private PendingIntent action(String name, int code) {
         return PendingIntent.getService(this, code,
-                new Intent(this, AlarmRingService.class).setAction(name),
+                new Intent(this, AlarmRingService.class).setAction(name).putExtra("alarm_id", alarmId),
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
     }
     @Override public void onCreate() { super.onCreate(); channel(this); }
     @Override public int onStartCommand(Intent intent, int flags, int startId) {
         String name = intent == null ? DISMISS : intent.getAction();
-        if (SNOOZE.equals(name)) { AlarmScheduler.snooze(this); stopSelf(); return START_NOT_STICKY; }
+        if (SNOOZE.equals(name)) {
+            AlarmScheduler.snooze(this, intent.getIntExtra("alarm_id", alarmId));
+            stopSelf(); return START_NOT_STICKY;
+        }
         if (!RING.equals(name)) { stopSelf(); return START_NOT_STICKY; }
+        alarmId = intent.getIntExtra("alarm_id", -1);
+        org.json.JSONObject alarm = AlarmStore.find(this, alarmId);
+        if (alarm == null || !alarm.optBoolean("enabled", true)) { stopSelf(); return START_NOT_STICKY; }
         PendingIntent open = PendingIntent.getActivity(this, 202, new Intent(this, MainActivity.class),
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
         Notification notification = new Notification.Builder(this, CHANNEL)
                 .setSmallIcon(R.drawable.ic_timer).setContentTitle("C’est l’heure !")
-                .setContentText("Alarme Sport Chrono")
+                .setContentText(alarm.optString("label", "Alarme Sport Chrono"))
                 .setContentIntent(open).setCategory(Notification.CATEGORY_ALARM).setOngoing(true)
                 .addAction(new Notification.Action.Builder(null, "Arrêter", action(DISMISS, 203)).build())
                 .addAction(new Notification.Action.Builder(null, "Rappel 5 min", action(SNOOZE, 204)).build())
@@ -63,7 +70,10 @@ public class AlarmRingService extends Service {
         startForeground(71, notification);
         if (Signals.prefs(this).getBoolean("sound", true)) {
             try {
-                ringtone = RingtoneManager.getRingtone(this, RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM));
+                String uri = alarm.optString("tone", "");
+                ringtone = RingtoneManager.getRingtone(this, uri.isEmpty()
+                        ? RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
+                        : android.net.Uri.parse(uri));
                 if (ringtone != null) {
                     if (Build.VERSION.SDK_INT >= 28) {
                         ringtone.setLooping(true);

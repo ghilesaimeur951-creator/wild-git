@@ -27,6 +27,13 @@ public class EngineCheck {
         check(s.displayMs(1234) == 1234);
         s.pause(1234); s.resume(9000);
         check(s.displayMs(10000) == 2234);
+        SessionEngine restored = SessionEngine.restore(s.snapshot(), 10001);
+        check(restored.displayMs(10000) == 2234);
+        s = new SessionEngine(SessionEngine.Mode.INTERVAL, 5, 30, 10, 4, 100);
+        s.tick(5100, e); s.pause(9000);
+        restored = SessionEngine.restore(s.snapshot(), 20_000);
+        check(restored.paused && restored.phase == SessionEngine.Phase.WORK
+                && restored.displayMs(20_000) == 26_100);
         System.out.println("SessionEngine OK");
     }
 }

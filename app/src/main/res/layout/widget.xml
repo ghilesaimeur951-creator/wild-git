@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:orientation="vertical" android:padding="12dp" android:background="#1B2629">
+    <TextView android:id="@+id/widget_open" android:layout_width="match_parent"
+        android:layout_height="wrap_content" android:text="SPORT CHRONO  ›"
+        android:textColor="#9FF0B1" android:textSize="16sp" android:textStyle="bold" />
+    <TextView android:id="@+id/widget_status" android:layout_width="match_parent"
+        android:layout_height="wrap_content" android:layout_marginTop="8dp"
+        android:text="Prêt à bouger" android:textColor="#FFFFFF" android:textSize="16sp" />
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="horizontal" android:layout_marginTop="10dp">
+        <TextView android:id="@+id/widget_start" android:layout_width="0dp"
+            android:layout_height="48dp" android:layout_weight="1" android:gravity="center"
+            android:text="4 × 30/10" android:textColor="#101619" android:textStyle="bold"
+            android:background="#9FF0B1" />
+        <TextView android:id="@+id/widget_chrono" android:layout_width="0dp"
+            android:layout_height="48dp" android:layout_weight="1" android:layout_marginStart="8dp"
+            android:gravity="center" android:text="Chrono" android:textColor="#FFFFFF"
+            android:background="#304145" />
+    </LinearLayout>
+</LinearLayout>

@@ -20,6 +20,13 @@ public final class SessionEngine {
     private long phaseEnd, pauseAt, stopwatchStart;
     private int lastCount = -1;
 
+    public static final class State {
+        public String mode, phase;
+        public int prepSeconds, workSeconds, restSeconds, rounds, round;
+        public long phaseEnd, pauseAt, stopwatchStart;
+        public boolean paused, finished;
+    }
+
     public SessionEngine(Mode mode, int prepSeconds, int workSeconds, int restSeconds, int rounds, long now) {
         if (mode == null || prepSeconds < 0 || workSeconds < 1 || restSeconds < 0 || rounds < 1)
             throw new IllegalArgumentException("Durée ou nombre de tours invalide");
@@ -85,5 +92,30 @@ public final class SessionEngine {
             paused = false;
             lastCount = -1;
         }
+    }
+
+    public State snapshot() {
+        State state = new State();
+        state.mode = mode.name(); state.phase = phase.name();
+        state.prepSeconds = (int) (prepMs / 1000);
+        state.workSeconds = (int) (workMs / 1000);
+        state.restSeconds = (int) (restMs / 1000);
+        state.rounds = rounds; state.round = round;
+        state.phaseEnd = phaseEnd; state.pauseAt = pauseAt;
+        state.stopwatchStart = stopwatchStart;
+        state.paused = paused; state.finished = finished;
+        return state;
+    }
+
+    public static SessionEngine restore(State state, long now) {
+        SessionEngine engine = new SessionEngine(Mode.valueOf(state.mode), state.prepSeconds,
+                state.workSeconds, state.restSeconds, state.rounds, now);
+        if (state.round < 1 || state.round > state.rounds || state.finished)
+            throw new IllegalArgumentException("État de séance invalide");
+        engine.phase = Phase.valueOf(state.phase);
+        engine.round = state.round; engine.phaseEnd = state.phaseEnd;
+        engine.pauseAt = state.pauseAt; engine.stopwatchStart = state.stopwatchStart;
+        engine.paused = state.paused;
+        return engine;
     }
 }

@@ -12,22 +12,37 @@ import android.os.IBinder;
 import android.os.Looper;
 import android.os.PowerManager;
 import android.os.SystemClock;
+import org.json.JSONArray;
 
 public class SessionService extends Service {
     static final String ACTION_START = "com.example.sportchrono.START";
     static final String ACTION_PAUSE = "com.example.sportchrono.PAUSE";
     static final String ACTION_RESUME = "com.example.sportchrono.RESUME";
     static final String ACTION_STOP = "com.example.sportchrono.STOP";
+    static final String ACTION_RESTORE = "com.example.sportchrono.RESTORE";
+    static final String ACTION_LAP = "com.example.sportchrono.LAP";
     static final String CHANNEL = "session";
     public static SessionEngine current;
+    public static JSONArray laps = new JSONArray();
+    private long startedWall, startedElapsed;
+    private VoiceCoach coach;
     private final Handler handler = new Handler(Looper.getMainLooper());
     private PowerManager.WakeLock wakeLock;
     private int lastNotificationSecond = -1;
     private final SessionEngine.Listener listener = new SessionEngine.Listener() {
-        public void count(int seconds) { Signals.beep(SessionService.this, false); }
-        public void phaseChanged() { Signals.beep(SessionService.this, false); notifyState(); }
+        public void count(int seconds) {
+            Signals.beep(SessionService.this, false);
+            if (coach != null) coach.say(String.valueOf(seconds));
+        }
+        public void phaseChanged() {
+            Signals.beep(SessionService.this, false);
+            announce(); persist(); notifyState(); WidgetProvider.refresh(SessionService.this);
+        }
         public void completed() {
             Signals.beep(SessionService.this, true);
+            if (coach != null) coach.say("Séance terminée");
+            SessionStore.record(SessionService.this, current, startedWall, startedElapsed, true, laps);
+            SessionStore.clear(SessionService.this);
             releaseWakeLock();
             NotificationManager nm = getSystemService(NotificationManager.class);
             nm.notify(42, new Notification.Builder(SessionService.this, CHANNEL)
@@ -36,6 +51,7 @@ public class SessionService extends Service {
                     .setContentIntent(openApp()).setAutoCancel(true).build());
             stopForeground(STOP_FOREGROUND_REMOVE);
             current = null;
+            WidgetProvider.refresh(SessionService.this);
             stopSelf();
         }
     };
@@ -57,8 +73,10 @@ public class SessionService extends Service {
         nm.createNotificationChannel(new NotificationChannel(CHANNEL, "Séance en cours", NotificationManager.IMPORTANCE_LOW));
     }
     @Override public int onStartCommand(Intent intent, int flags, int startId) {
-        if (intent == null) { stopSelf(); return START_NOT_STICKY; }
-        String action = intent.getAction();
+        String action = intent == null ? ACTION_RESTORE : intent.getAction();
+        if (!ACTION_START.equals(action) && current == null && SessionStore.hasSaved(this)) {
+            restoreSaved();
+        }
         if (ACTION_START.equals(action)) {
             handler.removeCallbacks(ticker);
             String value = intent.getStringExtra("mode");
@@ -70,24 +88,61 @@ public class SessionService extends Service {
                         intent.getIntExtra("work", 1), intent.getIntExtra("rest", 0),
                         intent.getIntExtra("rounds", 1), SystemClock.elapsedRealtime());
             } catch (IllegalArgumentException ignored) { stopSelf(); return START_NOT_STICKY; }
+            laps = new JSONArray(); startedWall = System.currentTimeMillis();
+            startedElapsed = SystemClock.elapsedRealtime();
+            if (coach != null) coach.shutdown();
+            coach = new VoiceCoach(this);
             startForeground(41, notification());
             acquireWakeLock();
+            persist();
+            final VoiceCoach newCoach = coach;
+            handler.postDelayed(() -> { if (coach == newCoach && current != null) announce(); }, 650);
+            WidgetProvider.refresh(this);
             lastNotificationSecond = -1;
             handler.post(ticker);
+        } else if (ACTION_RESTORE.equals(action)) {
+            if (current == null) { stopSelf(); return START_NOT_STICKY; }
         } else if (ACTION_STOP.equals(action)) {
+            if (current != null && current.mode == SessionEngine.Mode.STOPWATCH)
+                SessionStore.record(this, current, startedWall, startedElapsed, true, laps);
+            SessionStore.clear(this);
             current = null;
             handler.removeCallbacks(ticker);
             releaseWakeLock();
             stopForeground(STOP_FOREGROUND_REMOVE);
+            WidgetProvider.refresh(this);
             stopSelf();
         } else if (current != null && ACTION_PAUSE.equals(action)) {
             current.pause(SystemClock.elapsedRealtime());
-            releaseWakeLock(); notifyState();
+            persist(); releaseWakeLock(); notifyState(); WidgetProvider.refresh(this);
         } else if (current != null && ACTION_RESUME.equals(action)) {
             current.resume(SystemClock.elapsedRealtime());
-            acquireWakeLock(); notifyState();
+            persist(); acquireWakeLock(); notifyState(); WidgetProvider.refresh(this);
+        } else if (current != null && ACTION_LAP.equals(action) && current.mode == SessionEngine.Mode.STOPWATCH) {
+            laps.put(current.displayMs(SystemClock.elapsedRealtime()));
+            persist();
         }
-        return START_NOT_STICKY;
+        return START_STICKY;
+    }
+    private void restoreSaved() {
+        SessionStore.Recovery recovery = SessionStore.load(this);
+        if (recovery == null) { SessionStore.clear(this); return; }
+        current = recovery.engine; laps = recovery.laps;
+        startedWall = recovery.startedWall; startedElapsed = recovery.startedElapsed;
+        coach = new VoiceCoach(this);
+        startForeground(41, notification());
+        if (!current.paused) acquireWakeLock();
+        handler.removeCallbacks(ticker);
+        handler.post(ticker);
+        WidgetProvider.refresh(this);
+    }
+    private void persist() {
+        if (current != null) SessionStore.save(this, current, startedWall, startedElapsed, laps);
+    }
+    private void announce() {
+        if (coach == null || current == null || current.finished) return;
+        coach.say(current.phase == SessionEngine.Phase.PREPARE ? "Préparez-vous"
+                : current.phase == SessionEngine.Phase.REST ? "Repos" : "Effort");
     }
     private void acquireWakeLock() {
         if (wakeLock == null) wakeLock = getSystemService(PowerManager.class)
@@ -127,6 +182,7 @@ public class SessionService extends Service {
     @Override public void onDestroy() {
         handler.removeCallbacks(ticker);
         releaseWakeLock(); current = null;
+        if (coach != null) coach.shutdown();
         super.onDestroy();
     }
     @Override public IBinder onBind(Intent intent) { return null; }
