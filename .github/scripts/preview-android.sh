@@ -39,8 +39,6 @@ tap_text 'Séances'
 capture 02-seances
 tap_text 'Créer ou charger une séance'
 capture 03-creation
-adb shell input swipe 200 780 200 350 380
-sleep 1
 adb shell uiautomator dump /sdcard/window.xml >/dev/null
 adb exec-out cat /sdcard/window.xml > ui-captures/current.xml
 coords=$(python3 - <<'PY'
