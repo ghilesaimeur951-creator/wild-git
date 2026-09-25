@@ -8,6 +8,7 @@ import android.os.Build;
 import android.view.View;
 import android.view.WindowInsets;
 import android.view.WindowManager;
+import android.view.ViewParent;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.Button;
@@ -78,12 +79,13 @@ final class UiKit {
     }
     static void insets(Activity a, View container, View navigation) {
         container.setOnApplyWindowInsetsListener((v, insets) -> {
-            int top, bottom;
+            int top, bottom, imeBottom = 0;
             boolean keyboard;
             if (Build.VERSION.SDK_INT >= 30) {
                 android.graphics.Insets bars = insets.getInsets(WindowInsets.Type.systemBars());
                 top = bars.top; bottom = bars.bottom;
                 keyboard = insets.isVisible(WindowInsets.Type.ime());
+                if (keyboard) imeBottom = insets.getInsets(WindowInsets.Type.ime()).bottom;
             } else {
                 top = insets.getSystemWindowInsetTop(); bottom = insets.getSystemWindowInsetBottom();
                 android.graphics.Rect frame = new android.graphics.Rect();
@@ -91,8 +93,16 @@ final class UiKit {
                 keyboard = bottom > dp(a, 120)
                         || v.getRootView().getHeight() - frame.bottom > dp(a, 160);
             }
-            v.setPadding(0, top, 0, keyboard ? 0 : bottom);
+            v.setPadding(0, top, 0, keyboard ? Math.max(bottom, imeBottom) : bottom);
             if (navigation != null) navigation.setVisibility(keyboard ? View.GONE : View.VISIBLE);
+            if (keyboard) v.post(() -> {
+                View focused = a.getCurrentFocus();
+                ViewParent parent = focused == null ? null : focused.getParent();
+                while (parent != null && !(parent instanceof ScrollView)) parent = parent.getParent();
+                if (focused != null && parent instanceof ScrollView)
+                    focused.requestRectangleOnScreen(new android.graphics.Rect(0, 0,
+                            focused.getWidth(), focused.getHeight() + dp(a, 16)), true);
+            });
             return insets;
         });
         container.requestApplyInsets();
