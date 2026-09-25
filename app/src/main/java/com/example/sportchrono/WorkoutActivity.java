@@ -34,6 +34,8 @@ public class WorkoutActivity extends Activity {
     private EditText name, prep, warmup, cooldown, sets, reps, cap, restSeries, restExercise;
     private Spinner mode;
     private LinearLayout modePanel, root, controls, actualPanel;
+    private ScrollView screenScroll;
+    private View exerciseAnchor;
     private final Map<String, EditText> special = new HashMap<>();
     private Spinner direction;
     private CheckBox peak;
@@ -86,7 +88,7 @@ public class WorkoutActivity extends Activity {
         catch (Exception ignored) { return fallback; }
     }
     private void formRoot(String title, String subtitle) {
-        root = UiKit.column(this); UiKit.screen(this, root);
+        root = UiKit.column(this); screenScroll = UiKit.screen(this, root);
         add(root, text(title, 27, UiKit.TEXT, true), 0);
         add(root, text(subtitle, 15, UiKit.MUTED, false), 7);
     }
@@ -124,7 +126,16 @@ public class WorkoutActivity extends Activity {
             public void onNothingSelected(android.widget.AdapterView<?> parent) { }
         });
         renderModeFields();
-        add(root, text("Paramètres par défaut", 21, UiKit.TEXT, true), 23);
+        exerciseAnchor = text("Exercices · dans l’ordre de la séance", 21, UiKit.TEXT, true);
+        add(root, exerciseAnchor, 25);
+        add(root, button("+ Ajouter un exercice", true, v -> {
+            if (capture(true)) startActivityForResult(new Intent(this, CatalogActivity.class)
+                    .putExtra(CatalogActivity.SELECT, true), 31);
+        }), 10);
+        for (int i = 0; i < draft.exercises.size(); i++) addExerciseCard(i);
+        add(root, text("Paramètres par défaut", 21, UiKit.TEXT, true), 24);
+        add(root, text("Ces valeurs s’appliquent aux exercices sans réglage personnel.",
+                14, UiKit.MUTED, false), 6);
         prep = input(root, "Préparation · secondes", draft.prepSec);
         warmup = input(root, "Échauffement facultatif · secondes", draft.warmupSec);
         cooldown = input(root, "Retour au calme facultatif · secondes", draft.cooldownSec);
@@ -133,12 +144,6 @@ public class WorkoutActivity extends Activity {
         cap = input(root, "Durée maximale d’une série · secondes (0 = sans limite)", draft.defaultCapSec);
         restSeries = input(root, "Repos entre séries · secondes", draft.restSeriesSec);
         restExercise = input(root, "Repos entre exercices · secondes", draft.restExerciseSec);
-        add(root, text("Exercices · dans l’ordre de la séance", 21, UiKit.TEXT, true), 25);
-        add(root, button("+ Ajouter un exercice", true, v -> {
-            if (capture(true)) startActivityForResult(new Intent(this, CatalogActivity.class)
-                    .putExtra(CatalogActivity.SELECT, true), 31);
-        }), 10);
-        for (int i = 0; i < draft.exercises.size(); i++) addExerciseCard(i);
         add(root, text("Les options d’un exercice remplacent les valeurs par défaut uniquement lorsqu’elles sont cochées.",
                 14, UiKit.MUTED, false), 18);
         add(root, button("Enregistrer le modèle", false, v -> {
@@ -272,7 +277,7 @@ public class WorkoutActivity extends Activity {
                 .setNegativeButton("Annuler", null)
                 .setPositiveButton("Retirer", (d, which) -> {
                     capture(false); draft.exercises.remove(position);
-                    WorkoutStore.saveDraft(this, draft); renderBuilder();
+                    WorkoutStore.saveDraft(this, draft); rebuildNearExercises();
                 }).show());
         actions.addView(up, new LinearLayout.LayoutParams(0, UiKit.dp(this, 54), 1));
         actions.addView(down, new LinearLayout.LayoutParams(0, UiKit.dp(this, 54), 1));
@@ -284,7 +289,12 @@ public class WorkoutActivity extends Activity {
         capture(false);
         WorkoutPlan.Exercise e = draft.exercises.remove(from);
         draft.exercises.add(from + delta, e);
-        WorkoutStore.saveDraft(this, draft); renderBuilder();
+        WorkoutStore.saveDraft(this, draft); rebuildNearExercises();
+    }
+    private void rebuildNearExercises() {
+        int oldY = screenScroll == null ? 0 : screenScroll.getScrollY();
+        renderBuilder();
+        screenScroll.post(() -> screenScroll.scrollTo(0, Math.max(0, oldY)));
     }
     private CheckBox option(LinearLayout panel, String label, boolean checked) {
         CheckBox box = new CheckBox(this); box.setText(label); box.setTextColor(UiKit.TEXT);
@@ -357,7 +367,7 @@ public class WorkoutActivity extends Activity {
                 e.kilograms = kg; e.perSide = sides.isChecked();
                 e.notes = notesOption.isChecked() ? notes.getText().toString().trim() : "";
                 capture(false); WorkoutStore.saveDraft(this, draft);
-                dialog.dismiss(); renderBuilder();
+                dialog.dismiss(); rebuildNearExercises();
             } catch (IllegalArgumentException error) { toast("Vérifiez les nombres et la charge en kg."); }
         }));
         dialog.show();
@@ -370,6 +380,8 @@ public class WorkoutActivity extends Activity {
             if (catalog != null) {
                 draft.exercises.add(CatalogStore.asPlanExercise(catalog));
                 WorkoutStore.saveDraft(this, draft); renderBuilder();
+                screenScroll.post(() -> screenScroll.smoothScrollTo(0,
+                        Math.max(0, exerciseAnchor.getTop() - UiKit.dp(this, 20))));
             }
         }
     }

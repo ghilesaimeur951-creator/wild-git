@@ -84,12 +84,8 @@ public class MainActivity extends Activity {
         return v;
     }
     private Button button(String title, boolean primary, View.OnClickListener click) {
-        Button b = new Button(this); b.setText(title); b.setAllCaps(false); b.setTextSize(15);
-        b.setTextColor(primary ? BG : TEXT);
-        b.setPadding(dp(8), 0, dp(8), 0);
-        b.setBackground(surface(primary ? MINT : 0xff304145, 14));
-        b.setOnClickListener(click);
-        b.setMinHeight(dp(56));
+        Button b = UiKit.button(this, title, primary, click);
+        b.setTextSize(15);
         return b;
     }
     private void build() {
@@ -168,18 +164,10 @@ public class MainActivity extends Activity {
         add(form, text(subtitle, 14, MUTED, false), 7);
     }
     private EditText number(String label, String initial) {
-        add(form, text(label, 14, MUTED, true), 18);
-        EditText input = new EditText(this); input.setSingleLine(true);
-        input.setInputType(2); input.setText(initial); input.setTextColor(TEXT);
-        input.setTextSize(20); input.setSelectAllOnFocus(true);
-        input.setBackgroundTintList(android.content.res.ColorStateList.valueOf(MINT));
-        add(form, input, 2); return input;
+        return UiKit.input(this, form, label, initial, true);
     }
     private EditText name(String label, String initial) {
-        add(form, text(label, 14, MUTED, true), 18);
-        EditText input = new EditText(this); input.setSingleLine(true); input.setText(initial);
-        input.setTextColor(TEXT); input.setTextSize(18);
-        add(form, input, 2); return input;
+        return UiKit.input(this, form, label, initial, false);
     }
     private int value(EditText input, int min, int max) {
         try {
@@ -438,12 +426,17 @@ public class MainActivity extends Activity {
                 if (split > 0) best = Math.min(best, split);
                 previous = laps.optLong(n);
             }
-            add(form, text(title + " · " + date + "\n" + format(seconds * 1000, false)
+            LinearLayout entryCard = column();
+            entryCard.setPadding(dp(16), dp(14), dp(16), dp(14));
+            entryCard.setBackground(surface(CARD, 16));
+            add(form, entryCard, 10);
+            add(entryCard, text(title + " · " + date, 17, TEXT, true), 0);
+            add(entryCard, text(format(seconds * 1000, false)
                     + ("INTERVAL".equals(mode) ? " · " + entry.optInt("rounds") + " tours" : "")
                     + ("STOPWATCH".equals(mode) ? " · "
                         + (laps == null ? 0 : laps.length()) + " repères"
                         + (best == Long.MAX_VALUE ? "" : " · meilleur tour " + format(best, false)) : ""),
-                    17, TEXT, false), 18);
+                    14, MUTED, false), 5);
         }
     }
     private void showWorkoutHistory(JSONObject entry) {
