@@ -2,10 +2,12 @@
 set -euo pipefail
 
 mkdir -p ui-captures
+adb shell wm size 360x800
+adb shell wm density 160
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 adb shell pm grant com.example.sportchrono android.permission.POST_NOTIFICATIONS
 adb shell am start -n com.example.sportchrono/.MainActivity
-sleep 3
+sleep 5
 
 capture() {
   adb exec-out screencap -p > "ui-captures/$1.png"

@@ -98,7 +98,16 @@ final class UiKit {
         container.requestApplyInsets();
     }
     static FrameLayout photoHero(Activity a, int drawable, String eyebrow, String title, String subtitle) {
-        FrameLayout frame = new FrameLayout(a);
+        LinearLayout caption = column(a);
+        FrameLayout frame = new FrameLayout(a) {
+            @Override protected void onMeasure(int widthSpec, int ignoredHeightSpec) {
+                int height = dp(a, 194);
+                super.onMeasure(widthSpec, View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY));
+                int needed = caption.getMeasuredHeight() + dp(a, 18);
+                if (needed > height) super.onMeasure(widthSpec,
+                        View.MeasureSpec.makeMeasureSpec(needed, View.MeasureSpec.EXACTLY));
+            }
+        };
         frame.setBackground(background(a, CARD, 22)); frame.setClipToOutline(true);
         ImageView photo = new ImageView(a); photo.setImageResource(drawable);
         photo.setScaleType(ImageView.ScaleType.CENTER_CROP);
@@ -107,7 +116,6 @@ final class UiKit {
                 new int[]{0x4d091516, 0xb3091516, 0xff0d1516});
         View overlay = new View(a); overlay.setBackground(shade);
         frame.addView(overlay, new FrameLayout.LayoutParams(-1, -1));
-        LinearLayout caption = column(a);
         caption.setPadding(dp(a, 20), dp(a, 18), dp(a, 20), dp(a, 20));
         FrameLayout.LayoutParams cp = new FrameLayout.LayoutParams(-1, -2, android.view.Gravity.BOTTOM);
         frame.addView(caption, cp);
@@ -115,7 +123,6 @@ final class UiKit {
         add(a, caption, text(a, title, 27, TEXT, true), 8);
         add(a, caption, text(a, subtitle, 14, TEXT, false), 7);
         frame.setContentDescription(title + ". " + subtitle);
-        frame.setMinimumHeight(dp(a, 194));
         return frame;
     }
 }
