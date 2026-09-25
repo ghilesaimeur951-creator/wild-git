@@ -12,6 +12,7 @@ import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.Spinner;
+import android.widget.ScrollView;
 import android.widget.Toast;
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -31,7 +32,8 @@ public class CatalogActivity extends Activity {
     private boolean selecting;
 
     @Override public void onCreate(Bundle state) {
-        super.onCreate(state); selecting = getIntent().getBooleanExtra(SELECT, false);
+        super.onCreate(state); UiKit.configureWindow(this);
+        selecting = getIntent().getBooleanExtra(SELECT, false);
         render();
     }
     private Spinner spinner(String[] labels, int selected) {
@@ -45,6 +47,9 @@ public class CatalogActivity extends Activity {
                 26, UiKit.TEXT, true), 0);
         UiKit.add(this, root, UiKit.text(this, "Rechercher, personnaliser et retrouver vos favoris.",
                 15, UiKit.MUTED, false), 8);
+        UiKit.add(this, root, UiKit.photoHero(this, R.drawable.pullup_photo,
+                "MOUVEMENTS", "Votre répertoire.",
+                "Des favoris pour composer votre prochaine séance."), 17);
         UiKit.add(this, root, UiKit.button(this, "Ajouter un exercice personnel", true,
                 v -> edit(null)), 18);
         search = UiKit.input(this, root, "Recherche", "", false);
@@ -89,21 +94,31 @@ public class CatalogActivity extends Activity {
             card.setBackground(UiKit.background(this, UiKit.CARD, 14));
             UiKit.add(this, rows, card, 9);
             String label = item.optString("name") + (isHidden ? " · masqué" : "");
-            UiKit.add(this, card, UiKit.button(this, label, selecting && !isHidden, v -> {
+            LinearLayout heading = new LinearLayout(this);
+            android.widget.Button nameButton = UiKit.button(this, label, selecting && !isHidden, v -> {
                 if (selecting && !isHidden) {
                     setResult(RESULT_OK, new Intent().putExtra("exercise_id", item.optString("id")));
                     finish();
                 } else edit(item);
-            }), 0);
-            UiKit.add(this, card, UiKit.text(this, cat + " · " + item.optString("unit"),
-                    13, UiKit.MUTED, false), 6);
-            UiKit.add(this, card, UiKit.button(this, fav ? "★ Retirer des favoris" : "☆ Ajouter aux favoris",
-                    false, v -> {
+            });
+            nameButton.setTextSize(15); nameButton.setGravity(android.view.Gravity.CENTER_VERTICAL
+                    | android.view.Gravity.START);
+            heading.addView(nameButton, new LinearLayout.LayoutParams(0, UiKit.dp(this, 57), 1));
+            android.widget.Button star = UiKit.button(this, fav ? "★" : "☆", false, v -> {
                 try { item.put("favorite", !fav); CatalogStore.upsert(this, item); fill(); }
                 catch (JSONException ignored) { }
-            }), 8);
-            UiKit.add(this, card, UiKit.button(this, "Modifier", false, v -> edit(item)), 5);
-            UiKit.add(this, card, UiKit.button(this, item.optBoolean("custom") ? "Supprimer" :
+            });
+            star.setTextSize(24); star.setContentDescription(fav ? "Retirer des favoris" : "Ajouter aux favoris");
+            LinearLayout.LayoutParams starSize = new LinearLayout.LayoutParams(UiKit.dp(this, 55),
+                    UiKit.dp(this, 57)); starSize.leftMargin = UiKit.dp(this, 6);
+            heading.addView(star, starSize);
+            UiKit.add(this, card, heading, 0);
+            UiKit.add(this, card, UiKit.text(this, cat + " · " + item.optString("unit"),
+                    13, UiKit.MUTED, false), 6);
+            LinearLayout actions = new LinearLayout(this);
+            android.widget.Button edit = UiKit.button(this, "Modifier", false, v -> edit(item));
+            actions.addView(edit, new LinearLayout.LayoutParams(0, UiKit.dp(this, 48), 1));
+            android.widget.Button remove = UiKit.button(this, item.optBoolean("custom") ? "Supprimer" :
                     isHidden ? "Réactiver" : "Masquer", false, v -> {
                 if (isHidden) {
                     try { item.put("hidden", false); CatalogStore.upsert(this, item); fill(); }
@@ -112,7 +127,10 @@ public class CatalogActivity extends Activity {
                         .setNegativeButton("Annuler", null).setPositiveButton("Retirer", (d, which) -> {
                             CatalogStore.delete(this, item); fill();
                         }).show();
-            }), 5);
+            });
+            LinearLayout.LayoutParams half = new LinearLayout.LayoutParams(0, UiKit.dp(this, 48), 1);
+            half.leftMargin = UiKit.dp(this, 7); actions.addView(remove, half);
+            UiKit.add(this, card, actions, 9);
         }
         if (shown == 0) UiKit.add(this, rows, UiKit.text(this, "Aucun exercice trouvé.",
                 16, UiKit.MUTED, false), 12);
@@ -133,8 +151,9 @@ public class CatalogActivity extends Activity {
         CheckBox sides = new CheckBox(this); sides.setText("Compter jambe ou bras gauche et droit séparément");
         sides.setTextColor(UiKit.TEXT); sides.setChecked(current != null && current.optBoolean("perSide"));
         UiKit.add(this, panel, sides, 8);
+        ScrollView scroll = new ScrollView(this); scroll.setFillViewport(false); scroll.addView(panel);
         AlertDialog dialog = new AlertDialog.Builder(this).setTitle(current == null ? "Nouvel exercice" : "Modifier l’exercice")
-                .setView(panel).setNegativeButton("Annuler", null).setPositiveButton("Enregistrer", null).create();
+                .setView(scroll).setNegativeButton("Annuler", null).setPositiveButton("Enregistrer", null).create();
         dialog.setOnShowListener(d -> dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
             String title = name.getText().toString().trim();
             if (title.isEmpty()) { Toast.makeText(this, "Le nom est obligatoire.", Toast.LENGTH_SHORT).show(); return; }
@@ -148,5 +167,6 @@ public class CatalogActivity extends Activity {
             } catch (JSONException ignored) { }
         }));
         dialog.show();
+        dialog.getWindow().setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
     }
 }

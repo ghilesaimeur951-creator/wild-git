@@ -35,8 +35,8 @@ import org.json.JSONException;
 import java.util.Locale;
 
 public class MainActivity extends Activity {
-    private static final int BG = 0xff101619, CARD = 0xff1b2629, MINT = 0xff9ff0b1;
-    private static final int TEXT = 0xfff3f7f4, MUTED = 0xffa8b9b3;
+    private static final int BG = UiKit.BG, CARD = UiKit.CARD, MINT = UiKit.MINT;
+    private static final int TEXT = UiKit.TEXT, MUTED = UiKit.MUTED;
     private final Handler handler = new Handler(Looper.getMainLooper());
     private int tab = 0;
     private LinearLayout root, form;
@@ -50,6 +50,7 @@ public class MainActivity extends Activity {
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
+        UiKit.configureWindow(this);
         if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
                 != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, 10);
@@ -92,39 +93,63 @@ public class MainActivity extends Activity {
         return b;
     }
     private void build() {
+        statusTitle = statusTime = statusMeta = alarmStatus = lapList = null;
+        LinearLayout shell = column(); shell.setBackgroundColor(BG);
         ScrollView scroll = new ScrollView(this); scroll.setFillViewport(true);
-        scroll.setBackgroundColor(BG);
-        root = column(); root.setPadding(dp(20), dp(26), dp(20), dp(40));
-        scroll.addView(root); setContentView(scroll);
-        add(root, text("SPORT CHRONO", 13, MINT, true), 0);
-        add(root, text("À votre rythme.", 30, TEXT, true), 8);
-        add(root, text("Un entraînement clair, du premier bip au dernier.", 14, MUTED, false), 5);
-
-        LinearLayout status = column(); status.setPadding(dp(20), dp(20), dp(20), dp(20));
-        status.setBackground(surface(CARD, 20)); add(root, status, 24);
-        statusTitle = text("Prêt à démarrer", 16, MINT, true); add(status, statusTitle, 0);
-        statusTime = text("00:00", 54, TEXT, true); add(status, statusTime, 12);
-        statusMeta = text("Choisissez un mode ci-dessous", 14, MUTED, false); add(status, statusMeta, 4);
-        LinearLayout controls = new LinearLayout(this);
-        pauseButton = button("Pause", false, v -> control(SessionService.ACTION_PAUSE));
-        stopButton = button("Arrêter", false, v -> control(SessionService.ACTION_STOP));
-        LinearLayout.LayoutParams half = new LinearLayout.LayoutParams(0, dp(56), 1); half.rightMargin = dp(8);
-        controls.addView(pauseButton, half);
-        controls.addView(stopButton, new LinearLayout.LayoutParams(0, dp(56), 1));
-        add(status, controls, 16);
-
-        String[] names = {"Chrono", "Minuteur", "Intervalles", "Créer séance", "Alarmes", "Historique", "Réglages"};
-        LinearLayout nav = column(); add(root, nav, 20);
-        for (int row = 0; row < 3; row++) {
-            LinearLayout line = new LinearLayout(this);
-            for (int i = row * 3; i < Math.min(names.length, row * 3 + 3); i++) {
-                final int selected = i;
-                Button b = button(names[i], i == tab, v -> { tab = selected; build(); });
-                LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(0, dp(54), 1);
-                if (i % 3 != 2) p.rightMargin = dp(7);
-                line.addView(b, p);
+        scroll.setVerticalScrollBarEnabled(false); scroll.setClipToPadding(false);
+        root = column(); root.setPadding(dp(18), dp(18), dp(18), dp(38));
+        scroll.addView(root);
+        shell.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
+        LinearLayout nav = new LinearLayout(this);
+        nav.setPadding(dp(8), dp(7), dp(8), dp(7)); nav.setBackgroundColor(CARD);
+        String[] destinations = {"Chronos", "Séances", "Alarmes", "Journal", "Réglages"};
+        int[] indexes = {0, 3, 4, 5, 6};
+        for (int i = 0; i < destinations.length; i++) {
+            final int selected = indexes[i];
+            boolean current = i == 0 ? tab <= 2 : tab == selected;
+            Button b = button(destinations[i], current, v -> { tab = selected; build(); });
+            b.setTextSize(11); b.setMinHeight(dp(53)); b.setPadding(dp(2), 0, dp(2), 0);
+            LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(0, dp(53), 1);
+            if (i > 0) p.leftMargin = dp(3);
+            nav.addView(b, p);
+        }
+        shell.addView(nav, new LinearLayout.LayoutParams(-1, -2));
+        setContentView(shell); UiKit.insets(this, shell, nav);
+        add(root, text("SPORT CHRONO  /  " + (tab < 3 ? "CHRONOS" : destinations[tab - 2]), 12, MINT, true), 0);
+        if (tab <= 2) {
+            add(root, UiKit.photoHero(this, R.drawable.running_photo,
+                    "BOUGEZ À VOTRE RYTHME", "Chaque seconde compte.",
+                    "Un temps clair, un geste simple, et vous avancez."), 16);
+            LinearLayout status = column(); status.setPadding(dp(20), dp(18), dp(20), dp(20));
+            status.setBackground(surface(CARD, 20)); add(root, status, 15);
+            statusTitle = text("Prêt à démarrer", 15, MINT, true); add(status, statusTitle, 0);
+            statusTime = text("00:00:00", 46, TEXT, true); add(status, statusTime, 8);
+            statusTime.setTypeface(Typeface.create("sans-serif-condensed", Typeface.BOLD));
+            statusTime.setAutoSizeTextTypeUniformWithConfiguration(29, 46, 1,
+                    android.util.TypedValue.COMPLEX_UNIT_SP);
+            statusMeta = text("Choisissez un mode ci-dessous", 14, MUTED, false); add(status, statusMeta, 4);
+            LinearLayout controls = new LinearLayout(this);
+            pauseButton = button("Pause", false, v -> control(SessionService.ACTION_PAUSE));
+            stopButton = button("Arrêter", false, v -> control(SessionService.ACTION_STOP));
+            LinearLayout.LayoutParams half = new LinearLayout.LayoutParams(0, dp(56), 1);
+            half.rightMargin = dp(8); controls.addView(pauseButton, half);
+            controls.addView(stopButton, new LinearLayout.LayoutParams(0, dp(56), 1));
+            add(status, controls, 14);
+            LinearLayout modes = new LinearLayout(this);
+            String[] names = {"Chrono", "Minuteur", "Intervalles"};
+            for (int i = 0; i < 3; i++) {
+                final int choice = i;
+                Button b = button(names[i], i == tab, v -> { tab = choice; build(); });
+                b.setTextSize(13);
+                LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(0, dp(52), 1);
+                if (i > 0) p.leftMargin = dp(6);
+                modes.addView(b, p);
             }
-            add(nav, line, row == 0 ? 0 : 7);
+            add(root, modes, 18);
+        } else if (tab == 3) {
+            add(root, UiKit.photoHero(this, R.drawable.pullup_photo,
+                    "STREET WORKOUT", "Votre séance, vos règles.",
+                    "Construisez, entraînez-vous et suivez vos progrès."), 16);
         }
         form = column(); add(root, form, 20);
         switch (tab) {
@@ -354,6 +379,7 @@ public class MainActivity extends Activity {
             } catch (JSONException ignored) { }
         }));
         dialog.show();
+        dialog.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
     }
     private void pickTone(int id) {
         pickingToneId = id;
@@ -496,6 +522,8 @@ public class MainActivity extends Activity {
                     new String[]{Manifest.permission.POST_NOTIFICATIONS}, 11);
             else Toast.makeText(this, "Gérées par les paramètres Android.", Toast.LENGTH_SHORT).show();
         }), 18);
+        add(form, text("Photos : Vitaly Gariev et Mathias Reding · Unsplash. Images incluses pour une utilisation hors connexion.",
+                13, MUTED, false), 24);
     }
     private String format(long ms, boolean countdown) {
         long seconds = countdown ? (ms + 999) / 1000 : ms / 1000;
@@ -503,12 +531,13 @@ public class MainActivity extends Activity {
                 (seconds / 60) % 60, seconds % 60);
     }
     private void refresh() {
-        if (statusTitle == null) return;
         SessionEngine s = SessionService.current;
         boolean active = s != null;
-        pauseButton.setVisibility(active ? View.VISIBLE : View.GONE);
-        stopButton.setVisibility(active ? View.VISIBLE : View.GONE);
-        if (active) {
+        if (statusTitle != null) {
+            pauseButton.setVisibility(active ? View.VISIBLE : View.GONE);
+            stopButton.setVisibility(active ? View.VISIBLE : View.GONE);
+        }
+        if (active && statusTitle != null) {
             long now = SystemClock.elapsedRealtime();
             statusTime.setText(format(s.displayMs(now), s.mode != SessionEngine.Mode.STOPWATCH));
             if (s.mode == SessionEngine.Mode.STOPWATCH) statusTitle.setText("Chronomètre");
@@ -520,7 +549,7 @@ public class MainActivity extends Activity {
             pauseButton.setText(s.paused ? "Reprendre" : "Pause");
             pauseButton.setOnClickListener(v -> control(s.paused ? SessionService.ACTION_RESUME : SessionService.ACTION_PAUSE));
             getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-        } else {
+        } else if (statusTitle != null) {
             statusTitle.setText("Prêt à démarrer"); statusTime.setText("00:00:00");
             statusMeta.setText("Choisissez un mode ci-dessous");
             getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);

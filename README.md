@@ -21,6 +21,8 @@ Application Android native, en français, avec :
 - validation anticipée des séries, repos automatiques, suivi des répétitions et récapitulatif détaillé ;
 - autorisation Internet déclarée pour les fonctionnalités futures (aucune transmission aujourd’hui).
 
+L’interface 1.3 réunit les chronomètres dans un écran, ajoute une barre de navigation fixe pour les grandes rubriques et maintient l’action principale d’une séance à portée du pouce. Les formulaires défilent lorsque le clavier s’ouvre, avec prise en compte des marges système. Les photographies sont incluses localement dans l’APK : [street workout, Vitaly Gariev](https://unsplash.com/photos/man-exercising-on-outdoor-pull-up-bar-WoowSixhpvQ) et [course, Mathias Reding](https://unsplash.com/photos/runners-legs-in-motion-with-a-long-shadow-G96xGokbTUM/), sous [licence Unsplash](https://unsplash.com/license).
+
 Les valeurs initiales d’une séance sont **4 tours, 5 s de préparation, 30 s d’effort et 10 s de repos**. Chaque tour inclut son repos, y compris le dernier. Le chronomètre et les intervalles restent actifs lorsque l’écran est verrouillé tant qu’Android laisse tourner le service au premier plan. Les temps reposent sur une horloge monotone : un affichage retardé ne prolonge pas les phases. La reprise est prévue après une fermeture du processus pendant le même démarrage du téléphone ; elle n’est pas garantie après un arrêt forcé de l’application ou un redémarrage du téléphone.
 
 ## Installer l’APK

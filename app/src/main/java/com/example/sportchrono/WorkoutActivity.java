@@ -3,6 +3,7 @@ package com.example.sportchrono;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Intent;
+import android.graphics.Typeface;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -18,6 +19,7 @@ import android.widget.ScrollView;
 import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
+import android.widget.ProgressBar;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -37,6 +39,7 @@ public class WorkoutActivity extends Activity {
     private CheckBox peak;
     private TextView runTitle, runTime, runMeta, runNext;
     private Button doneButton, skipButton, pauseButton, previousButton;
+    private ProgressBar runProgress;
     private EditText actual, left, right;
     private String displayedStep = "";
     private boolean hadRunning;
@@ -46,7 +49,7 @@ public class WorkoutActivity extends Activity {
     };
 
     @Override public void onCreate(Bundle state) {
-        super.onCreate(state); draft = WorkoutStore.draft(this);
+        super.onCreate(state); UiKit.configureWindow(this); draft = WorkoutStore.draft(this);
         if (WorkoutService.current != null || WorkoutStore.hasActive(this)) renderRun();
         else renderBuilder();
     }
@@ -102,6 +105,8 @@ public class WorkoutActivity extends Activity {
     private void renderBuilder() {
         editing = true; runningScreen = false; summaryScreen = false; displayedStep = "";
         formRoot("Créer une séance", "Composez votre entraînement street workout.");
+        add(root, UiKit.photoHero(this, R.drawable.pullup_photo, "VOTRE TERRAIN DE JEU",
+                "Un mouvement après l’autre.", "Préparez le plan. Le chrono s’occupe du rythme."), 18);
         add(root, button("Mes modèles", false, v -> { capture(false); renderTemplates(); }), 15);
         add(root, button("Catalogue d’exercices", false, v -> {
             capture(false); startActivity(new Intent(this, CatalogActivity.class));
@@ -314,6 +319,10 @@ public class WorkoutActivity extends Activity {
         CheckBox sides = option(panel, "Compter gauche et droite séparément", e.perSide);
         CheckBox notesOption = option(panel, "Ajouter une note", !e.notes.isEmpty());
         EditText notes = UiKit.input(this, panel, "Note personnelle", e.notes, false);
+        notes.setSingleLine(false); notes.setMinLines(2);
+        notes.setInputType(android.text.InputType.TYPE_CLASS_TEXT
+                | android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE
+                | android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
         setValue.setEnabled(setOption.isChecked()); repValue.setEnabled(repOption.isChecked());
         capValue.setEnabled(capOption.isChecked()); restValue.setEnabled(restOption.isChecked());
         loadType.setEnabled(loadOption.isChecked()); weight.setEnabled(loadOption.isChecked());
@@ -352,6 +361,7 @@ public class WorkoutActivity extends Activity {
             } catch (IllegalArgumentException error) { toast("Vérifiez les nombres et la charge en kg."); }
         }));
         dialog.show();
+        dialog.getWindow().setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
     }
     @Override protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
@@ -437,30 +447,63 @@ public class WorkoutActivity extends Activity {
     }
     private void renderRun() {
         editing = false; runningScreen = true; summaryScreen = false; displayedStep = "";
-        formRoot("Séance en cours", "Chaque validation lance automatiquement la suite.");
+        LinearLayout shell = UiKit.column(this); shell.setBackgroundColor(UiKit.BG);
+        ScrollView scroll = new ScrollView(this); scroll.setFillViewport(true);
+        scroll.setVerticalScrollBarEnabled(false);
+        root = UiKit.column(this);
+        root.setPadding(UiKit.dp(this, 18), UiKit.dp(this, 14), UiKit.dp(this, 18), UiKit.dp(this, 26));
+        scroll.addView(root);
+        shell.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
+        add(root, text("SÉANCE EN COURS", 12, UiKit.MINT, true), 0);
+        add(root, text("Chaque geste compte.", 25, UiKit.TEXT, true), 7);
         LinearLayout hero = UiKit.column(this); hero.setPadding(UiKit.dp(this, 18), UiKit.dp(this, 22),
                 UiKit.dp(this, 18), UiKit.dp(this, 22));
-        hero.setBackground(UiKit.background(this, UiKit.CARD, 20)); add(root, hero, 22);
+        hero.setBackground(UiKit.background(this, UiKit.CARD, 20)); add(root, hero, 17);
         runTitle = text("Démarrage…", 25, UiKit.MINT, true); add(hero, runTitle, 0);
-        runTime = text("00:00", 53, UiKit.TEXT, true); add(hero, runTime, 14);
+        runTime = text("00:00", 54, UiKit.TEXT, true);
+        runTime.setTypeface(Typeface.create("sans-serif-condensed", Typeface.BOLD));
+        runTime.setAutoSizeTextTypeUniformWithConfiguration(30, 54, 1,
+                android.util.TypedValue.COMPLEX_UNIT_SP);
+        add(hero, runTime, 12);
+        runProgress = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
+        runProgress.setMax(1000); runProgress.setProgressTintList(
+                android.content.res.ColorStateList.valueOf(UiKit.MINT));
+        runProgress.setProgressBackgroundTintList(
+                android.content.res.ColorStateList.valueOf(0xff314342));
+        add(hero, runProgress, 13);
         runMeta = text("Préparation de la séance", 18, UiKit.TEXT, false); add(hero, runMeta, 9);
         runNext = text("", 15, UiKit.MUTED, false); add(hero, runNext, 12);
         actualPanel = UiKit.column(this); add(root, actualPanel, 13);
-        doneButton = button("Terminé", true, v -> completeOrSkip()); add(root, doneButton, 13);
+        add(root, button("Terminer la séance", false, v -> confirm("Terminer la séance",
+                "La progression actuelle sera conservée dans l’historique comme séance interrompue.",
+                () -> command(WorkoutService.STOP))), 20);
+        LinearLayout footer = UiKit.column(this);
+        footer.setPadding(UiKit.dp(this, 18), UiKit.dp(this, 9),
+                UiKit.dp(this, 18), UiKit.dp(this, 9));
+        footer.setBackgroundColor(UiKit.CARD);
+        doneButton = button("Terminé", true, v -> completeOrSkip());
+        add(footer, doneButton, 0);
+        LinearLayout secondary = new LinearLayout(this);
         pauseButton = button("Pause", false, v -> {
             WorkoutEngine s = WorkoutService.current;
             command(s != null && s.paused() ? WorkoutService.RESUME : WorkoutService.PAUSE);
-        }); add(root, pauseButton, 9);
-        skipButton = button("Passer cette série", false, v -> confirm("Passer la série",
+        });
+        skipButton = button("Passer", false, v -> confirm("Passer la série",
                 "Elle sera notée comme passée, sans répétitions validées.", () -> command(WorkoutService.SKIP)));
-        add(root, skipButton, 9);
-        previousButton = button("Série précédente", false, v -> confirm("Revenir à la série précédente",
+        previousButton = button("← Série", false, v -> confirm("Revenir à la série précédente",
                 "Sa dernière validation sera effacée et son chronomètre redémarrera.",
                 () -> command(WorkoutService.PREVIOUS)));
-        add(root, previousButton, 9);
-        add(root, button("Terminer la séance", false, v -> confirm("Terminer la séance",
-                "La progression actuelle sera conservée dans l’historique comme séance interrompue.",
-                () -> command(WorkoutService.STOP))), 18);
+        previousButton.setContentDescription("Série précédente");
+        Button[] small = {pauseButton, skipButton, previousButton};
+        for (int i = 0; i < small.length; i++) {
+            small[i].setTextSize(13);
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, UiKit.dp(this, 48), 1);
+            if (i > 0) lp.leftMargin = UiKit.dp(this, 6);
+            secondary.addView(small[i], lp);
+        }
+        add(footer, secondary, 8);
+        shell.addView(footer, new LinearLayout.LayoutParams(-1, -2));
+        setContentView(shell); UiKit.insets(this, shell, secondary);
         refreshRun();
     }
     private void setActualInputs(WorkoutEngine engine, WorkoutEngine.Step step) {
@@ -532,6 +575,9 @@ public class WorkoutActivity extends Activity {
         boolean countingUp = working && step.durationMs == 0;
         long displayed = engine.displayMs(SystemClock.elapsedRealtime());
         runTime.setText(time(countingUp ? displayed : (displayed + 999) / 1000 * 1000));
+        runProgress.setVisibility(step.durationMs > 0 ? View.VISIBLE : View.GONE);
+        if (step.durationMs > 0) runProgress.setProgress((int) Math.max(0,
+                Math.min(1000, 1000 * displayed / step.durationMs)));
         if (working) {
             WorkoutPlan.Exercise x = engine.plan.exercises.get(step.exerciseIndex);
             String goals = "Série " + step.series + "/" + step.seriesTotal
@@ -546,8 +592,8 @@ public class WorkoutActivity extends Activity {
         } else runMeta.setText(engine.plan.name + (engine.plan.mode == WorkoutPlan.Mode.AMRAP
                 ? " · tour " + engine.round() : ""));
         runNext.setText(nextDescription(engine));
-        doneButton.setText(working ? "✓ Série terminée · lancer le repos" :
-                step.kind == WorkoutEngine.Kind.REST_EMOM ? "Départ automatique à la minute suivante"
+        doneButton.setText(working ? "✓ Terminé · lancer le repos" :
+                step.kind == WorkoutEngine.Kind.REST_EMOM ? "Départ automatique"
                 : step.isRest() ? "Passer le repos" : "Passer cette étape");
         doneButton.setEnabled(!engine.paused() && step.kind != WorkoutEngine.Kind.REST_EMOM);
         pauseButton.setText(engine.paused() ? "Reprendre" : "Pause");
