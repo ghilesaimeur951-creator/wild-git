@@ -94,17 +94,21 @@ final class UiKit {
                         || v.getRootView().getHeight() - frame.bottom > dp(a, 160);
             }
             v.setPadding(0, top, 0, keyboard ? Math.max(bottom, imeBottom) : bottom);
-            android.util.Log.d("SportChronoInsets", "height=" + v.getHeight() + " top=" + top
-                    + " bottom=" + bottom + " ime=" + imeBottom + " keyboard=" + keyboard);
             if (navigation != null) navigation.setVisibility(keyboard ? View.GONE : View.VISIBLE);
-            if (keyboard) v.post(() -> {
+            if (keyboard) v.postDelayed(() -> {
                 View focused = a.getCurrentFocus();
                 ViewParent parent = focused == null ? null : focused.getParent();
                 while (parent != null && !(parent instanceof ScrollView)) parent = parent.getParent();
-                if (focused != null && parent instanceof ScrollView)
-                    focused.requestRectangleOnScreen(new android.graphics.Rect(0, 0,
-                            focused.getWidth(), focused.getHeight() + dp(a, 16)), true);
-            });
+                if (focused != null && parent instanceof ScrollView) {
+                    ScrollView scroll = (ScrollView) parent;
+                    int[] field = new int[2], area = new int[2];
+                    focused.getLocationOnScreen(field); scroll.getLocationOnScreen(area);
+                    int safeBottom = area[1] + scroll.getHeight() - scroll.getPaddingBottom()
+                            - dp(a, 16);
+                    int overlap = field[1] + focused.getHeight() - safeBottom;
+                    if (overlap > 0) scroll.scrollBy(0, overlap);
+                }
+            }, 90);
             return insets;
         });
         container.requestApplyInsets();
